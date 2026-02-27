@@ -7,7 +7,7 @@ import { setupCronJobs } from "./cron-jobs";
 
 dotenv.config();
 
-const port = 3001;
+const port = 3701;
 const httpServer = createServer((req, res) => {
   // Simple internal broadcast API
   if (req.method === "POST" && req.url === "/broadcast") {
@@ -31,7 +31,7 @@ const httpServer = createServer((req, res) => {
 });
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NEXTAUTH_URL || "http://localhost:3000",
+    origin: process.env.NEXTAUTH_URL || "http://localhost:3201",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -45,12 +45,12 @@ io.use(async (socket, next) => {
     return next(new Error("Authentication error: No cookies found"));
   }
 
-  // Find next-auth.session-token in cookies
+  // Find oms-next-auth.session-token in cookies
   const cookies = Object.fromEntries(
     cookieHeader.split("; ").map((c) => c.split("=")),
   );
 
-  const token = cookies["next-auth.session-token"];
+  const token = cookies["oms-next-auth.session-token"];
 
   if (!token) {
     return next(new Error("Authentication error: Session token not found"));

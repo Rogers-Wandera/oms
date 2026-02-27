@@ -21,13 +21,20 @@ import {
   ThemeIcon,
 } from "@mantine/core";
 import { Building2, AlertCircle, Info } from "lucide-react";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const errorParam = searchParams.get("error");
@@ -38,21 +45,34 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const result = await signIn("credentials", {
+      const signInOptions: any = {
         email,
         password,
         redirect: false,
-      });
+      };
 
-      if (result?.error) {
-        setError(result.error || "Invalid email or password");
-      } else {
-        router.push("/dashboard");
-        router.refresh();
+      if (requiresTwoFactor) {
+        signInOptions.otp = otp;
       }
-    } catch {
+
+      const result = await signIn("credentials", signInOptions);
+
+      if (result?.error === "2FA_REQUIRED") {
+        setRequiresTwoFactor(true);
+        setError("Two-factor authentication is required.");
+        setIsLoading(false);
+      } else if (result?.error) {
+        setRequiresTwoFactor(false);
+        setError(result.error || "Invalid email or password");
+        setIsLoading(false);
+      } else if (result?.ok) {
+        // Let NextAuth handle the final redirect
+        window.location.href = "/dashboard";
+        return;
+      }
+    } catch (e) {
+      console.error("[Login] Exception:", e);
       setError("An unexpected error occurred. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -116,71 +136,138 @@ export default function LoginPage() {
                 </Alert>
               )}
 
-              <TextInput
-                label={
-                  <Text
-                    size="xs"
-                    fw={800}
-                    className="uppercase tracking-widest text-gray-500 mb-1"
-                  >
-                    Corporate Email
+              {requiresTwoFactor && !error && (
+                <Alert
+                  icon={<Info size={18} />}
+                  title={
+                    <Text fw={700} size="sm">
+                      Credentials Verified
+                    </Text>
+                  }
+                  color="blue"
+                  variant="light"
+                  className="rounded-xl border border-blue-500/20"
+                >
+                  <Text size="xs" fw={500}>
+                    Please enter your 2FA code to complete your login.
                   </Text>
-                }
-                placeholder="you@company.com"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.currentTarget.value)}
-                disabled={isLoading}
-                radius="md"
-                size="md"
-              />
+                </Alert>
+              )}
 
-              <Stack gap={6}>
-                <PasswordInput
-                  label={
+              {!requiresTwoFactor ? (
+                <>
+                  <TextInput
+                    label={
+                      <Text
+                        size="xs"
+                        fw={800}
+                        className="uppercase tracking-widest text-gray-500 mb-1"
+                      >
+                        Email Address
+                      </Text>
+                    }
+                    placeholder="you@company.com"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.currentTarget.value)}
+                    disabled={isLoading}
+                    radius="md"
+                    size="md"
+                  />
+
+                  <Stack gap={6}>
+                    <PasswordInput
+                      label={
+                        <Text
+                          size="xs"
+                          fw={800}
+                          className="uppercase tracking-widest text-gray-500 mb-1"
+                        >
+                          Account Password
+                        </Text>
+                      }
+                      placeholder="Your password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.currentTarget.value)}
+                      disabled={isLoading}
+                      radius="md"
+                      size="md"
+                    />
+                    <Group justify="flex-end">
+                      <Anchor
+                        component="button"
+                        type="button"
+                        size="xs"
+                        className="text-brand-600 dark:text-brand-400 font-bold hover:underline"
+                        onClick={() => router.push("/forgot-password")}
+                      >
+                        Reset password?
+                      </Anchor>
+                    </Group>
+                  </Stack>
+
+                  <Checkbox
+                    label={
+                      <Text
+                        size="sm"
+                        fw={500}
+                        className="text-gray-600 dark:text-gray-400"
+                      >
+                        Trust this device for 30 days
+                      </Text>
+                    }
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.currentTarget.checked)}
+                    color="brand"
+                  />
+                </>
+              ) : (
+                <Stack gap="xl">
+                  <Stack gap={8}>
                     <Text
                       size="xs"
                       fw={800}
-                      className="uppercase tracking-widest text-gray-500 mb-1"
+                      className="uppercase tracking-widest text-gray-500"
                     >
-                      Security Key
+                      Authenticator Code
                     </Text>
-                  }
-                  placeholder="Your password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.currentTarget.value)}
-                  disabled={isLoading}
-                  radius="md"
-                  size="md"
-                />
-                <Group justify="flex-end">
-                  <Anchor
-                    component="button"
-                    type="button"
-                    size="xs"
-                    className="text-brand-600 dark:text-brand-400 font-bold hover:underline"
-                    onClick={() => router.push("/forgot-password")}
-                  >
-                    Reset password?
-                  </Anchor>
-                </Group>
-              </Stack>
+                    <InputOTP
+                      maxLength={6}
+                      value={otp}
+                      onChange={setOtp}
+                      containerClassName="justify-center"
+                      autoFocus
+                    >
+                      <InputOTPGroup>
+                        {Array.from({ length: 6 }).map((_, index) => (
+                          <InputOTPSlot key={index} index={index} />
+                        ))}
+                      </InputOTPGroup>
+                    </InputOTP>
+                    <Text size="xs" fw={500} c="dimmed" ta="center">
+                      Enter the 6-digit code from your app or a 10-character
+                      backup code.
+                    </Text>
+                  </Stack>
 
-              <Checkbox
-                label={
-                  <Text
-                    size="sm"
-                    fw={500}
-                    className="text-gray-600 dark:text-gray-400"
-                  >
-                    Trust this device for 30 days
-                  </Text>
-                }
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.currentTarget.checked)}
-                color="brand"
-              />
+                  <Center>
+                    <Anchor
+                      component="button"
+                      type="button"
+                      size="xs"
+                      className="font-bold text-gray-500 hover:text-brand-600 transition-colors"
+                      onClick={() => {
+                        setRequiresTwoFactor(false);
+                        setOtp("");
+                        setError("");
+                      }}
+                    >
+                      ← Back to Login
+                    </Anchor>
+                  </Center>
+                </Stack>
+              )}
 
               <Button
                 fullWidth
@@ -191,7 +278,7 @@ export default function LoginPage() {
                 color="brand"
                 className="rounded-xl shadow-lg shadow-brand-500/20 h-12"
               >
-                Unlock Dashboard
+                {requiresTwoFactor ? "Verify & Unlock" : "Unlock Dashboard"}
               </Button>
             </Stack>
           </form>

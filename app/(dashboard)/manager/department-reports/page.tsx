@@ -41,7 +41,7 @@ export default async function DepartmentReportsPage({
     !session ||
     (session.user.role !== "MANAGER" && session.user.role !== "ADMIN")
   ) {
-    redirect("/login");
+    redirect("/dashboard");
   }
 
   const { page: pageParam } = await searchParams;

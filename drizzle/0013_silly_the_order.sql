@@ -1,0 +1,1 @@
+ALTER TABLE "oms"."tasks" ADD COLUMN "completed_at" timestamp;

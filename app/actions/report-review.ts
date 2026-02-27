@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { safeAction } from "@/lib/actions-utils";
 
 /**
  * Common submission logic for reports
@@ -17,16 +18,18 @@ export async function submitDailyReport(
   reportId: string,
   signatureUrl: string,
 ) {
-  await db
-    .update(dailyReports)
-    .set({
-      status: "SUBMITTED",
-      signatureUrl,
-      updateDate: new Date(),
-    })
-    .where(eq(dailyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(dailyReports)
+      .set({
+        status: "SUBMITTED",
+        signatureUrl,
+        updateDate: new Date(),
+      })
+      .where(eq(dailyReports.id, reportId));
 
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 export async function submitWeeklyReport(
@@ -34,17 +37,19 @@ export async function submitWeeklyReport(
   userComment: string,
   signatureUrl: string,
 ) {
-  await db
-    .update(weeklyReports)
-    .set({
-      status: "SUBMITTED",
-      summary: userComment, // Assuming summary stores the user's aggregated/final comment
-      signatureUrl,
-      updateDate: new Date(),
-    })
-    .where(eq(weeklyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(weeklyReports)
+      .set({
+        status: "SUBMITTED",
+        summary: userComment, // Assuming summary stores the user's aggregated/final comment
+        signatureUrl,
+        updateDate: new Date(),
+      })
+      .where(eq(weeklyReports.id, reportId));
 
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 export async function submitMonthlyReport(
@@ -52,17 +57,19 @@ export async function submitMonthlyReport(
   userComment: string,
   signatureUrl: string,
 ) {
-  await db
-    .update(monthlyReports)
-    .set({
-      status: "SUBMITTED",
-      summary: userComment,
-      signatureUrl,
-      updateDate: new Date(),
-    })
-    .where(eq(monthlyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(monthlyReports)
+      .set({
+        status: "SUBMITTED",
+        summary: userComment,
+        signatureUrl,
+        updateDate: new Date(),
+      })
+      .where(eq(monthlyReports.id, reportId));
 
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 /**
@@ -73,18 +80,20 @@ export async function supervisorApproveDailyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(dailyReports)
-    .set({
-      status: "REVIEWED",
-      supervisorSignatureUrl: signatureUrl,
-      supervisorComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(dailyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(dailyReports)
+      .set({
+        status: "REVIEWED",
+        supervisorSignatureUrl: signatureUrl,
+        supervisorComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(dailyReports.id, reportId));
 
-  revalidatePath("/supervisor/team");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/supervisor/team");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 export async function supervisorApproveWeeklyReport(
@@ -92,18 +101,20 @@ export async function supervisorApproveWeeklyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(weeklyReports)
-    .set({
-      status: "REVIEWED",
-      supervisorSignatureUrl: signatureUrl,
-      supervisorComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(weeklyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(weeklyReports)
+      .set({
+        status: "REVIEWED",
+        supervisorSignatureUrl: signatureUrl,
+        supervisorComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(weeklyReports.id, reportId));
 
-  revalidatePath("/supervisor/team");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/supervisor/team");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 export async function supervisorApproveMonthlyReport(
@@ -111,18 +122,20 @@ export async function supervisorApproveMonthlyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(monthlyReports)
-    .set({
-      status: "REVIEWED",
-      supervisorSignatureUrl: signatureUrl,
-      supervisorComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(monthlyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(monthlyReports)
+      .set({
+        status: "REVIEWED",
+        supervisorSignatureUrl: signatureUrl,
+        supervisorComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(monthlyReports.id, reportId));
 
-  revalidatePath("/supervisor/team");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/supervisor/team");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 /**
@@ -133,18 +146,20 @@ export async function headApproveDailyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(dailyReports)
-    .set({
-      status: "HEAD_REVIEWED",
-      headSignatureUrl: signatureUrl,
-      headComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(dailyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(dailyReports)
+      .set({
+        status: "HEAD_REVIEWED",
+        headSignatureUrl: signatureUrl,
+        headComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(dailyReports.id, reportId));
 
-  revalidatePath("/supervisor/team");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/supervisor/team");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 export async function headApproveWeeklyReport(
@@ -152,18 +167,20 @@ export async function headApproveWeeklyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(weeklyReports)
-    .set({
-      status: "HEAD_REVIEWED",
-      headSignatureUrl: signatureUrl,
-      headComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(weeklyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(weeklyReports)
+      .set({
+        status: "HEAD_REVIEWED",
+        headSignatureUrl: signatureUrl,
+        headComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(weeklyReports.id, reportId));
 
-  revalidatePath("/supervisor/team");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/supervisor/team");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 export async function headApproveMonthlyReport(
@@ -171,18 +188,20 @@ export async function headApproveMonthlyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(monthlyReports)
-    .set({
-      status: "HEAD_REVIEWED",
-      headSignatureUrl: signatureUrl,
-      headComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(monthlyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(monthlyReports)
+      .set({
+        status: "HEAD_REVIEWED",
+        headSignatureUrl: signatureUrl,
+        headComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(monthlyReports.id, reportId));
 
-  revalidatePath("/supervisor/team");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/supervisor/team");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 /**
@@ -193,18 +212,20 @@ export async function managerApproveDailyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(dailyReports)
-    .set({
-      status: "APPROVED",
-      managerSignatureUrl: signatureUrl,
-      managerComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(dailyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(dailyReports)
+      .set({
+        status: "APPROVED",
+        managerSignatureUrl: signatureUrl,
+        managerComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(dailyReports.id, reportId));
 
-  revalidatePath("/manager/reviews");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/manager/reviews");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 export async function managerApproveWeeklyReport(
@@ -212,18 +233,20 @@ export async function managerApproveWeeklyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(weeklyReports)
-    .set({
-      status: "APPROVED",
-      managerSignatureUrl: signatureUrl,
-      managerComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(weeklyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(weeklyReports)
+      .set({
+        status: "APPROVED",
+        managerSignatureUrl: signatureUrl,
+        managerComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(weeklyReports.id, reportId));
 
-  revalidatePath("/manager/reviews");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/manager/reviews");
+    revalidatePath("/dashboard/reports");
+  });
 }
 
 export async function managerApproveMonthlyReport(
@@ -231,16 +254,18 @@ export async function managerApproveMonthlyReport(
   signatureUrl: string,
   comment?: string,
 ) {
-  await db
-    .update(monthlyReports)
-    .set({
-      status: "APPROVED",
-      managerSignatureUrl: signatureUrl,
-      managerComment: comment,
-      updateDate: new Date(),
-    })
-    .where(eq(monthlyReports.id, reportId));
+  return safeAction(async () => {
+    await db
+      .update(monthlyReports)
+      .set({
+        status: "APPROVED",
+        managerSignatureUrl: signatureUrl,
+        managerComment: comment,
+        updateDate: new Date(),
+      })
+      .where(eq(monthlyReports.id, reportId));
 
-  revalidatePath("/manager/reviews");
-  revalidatePath("/dashboard/reports");
+    revalidatePath("/manager/reviews");
+    revalidatePath("/dashboard/reports");
+  });
 }

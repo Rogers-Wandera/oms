@@ -69,11 +69,13 @@ export const auditTypeEnum = omsSchema.enum("audit_type", [
 // 3. Audit Helper Columns
 const auditColumns = {
   createdBy: uuid("created_by"),
-  creationDate: timestamp("creation_date").defaultNow().notNull(),
+  creationDate: timestamp("creation_date", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedBy: uuid("updated_by"),
-  updateDate: timestamp("update_date"),
+  updateDate: timestamp("update_date", { withTimezone: true }),
   deletedBy: uuid("deleted_by"),
-  deleteDate: timestamp("delete_date"),
+  deleteDate: timestamp("delete_date", { withTimezone: true }),
 };
 
 // 4. Tables
@@ -97,6 +99,7 @@ export const users = omsSchema.table(
     departmentId: uuid("department_id").references(() => departments.id),
     supervisorId: uuid("supervisor_id"),
     signatureUrl: text("signature_url"),
+    avatarUrl: text("avatar_url"),
     phone: text("phone"),
     joinedDate: date("joined_date").defaultNow().notNull(),
     monthEndDay: integer("month_end_day").default(30).notNull(), // 1-30
@@ -166,7 +169,7 @@ export const users = omsSchema.table(
       }>()
       .default({
         security: {
-          twoFactorMethod: "EMAIL",
+          twoFactorMethod: "TOTP",
           twoFactorEnabled: false,
           twoFactorBackupCodes: [],
           twoFactorSecret: null,
@@ -233,6 +236,7 @@ export const tasks = omsSchema.table("tasks", {
   assignedTo: uuid("assigned_to")
     .references(() => users.id)
     .notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
   ...auditColumns,
 });
 
@@ -243,6 +247,8 @@ export const subTasks = omsSchema.table("sub_tasks", {
     .notNull(),
   title: text("title").notNull(),
   isDone: boolean("is_done").default(false).notNull(),
+  dueDate: date("due_date"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
   ...auditColumns,
 });
 
@@ -294,6 +300,10 @@ export const attendance = omsSchema.table(
     date: date("date").notNull(),
     clockIn: timestamp("clock_in"),
     clockOut: timestamp("clock_out"),
+    latIn: text("lat_in"),
+    longIn: text("long_in"),
+    latOut: text("lat_out"),
+    longOut: text("long_out"),
     ...auditColumns,
   },
   (table) => ({
@@ -312,6 +322,7 @@ export const weeklyReports = omsSchema.table("weekly_reports", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   summary: text("summary"),
+  accomplishments: jsonb("accomplishments").$type<any[]>(),
   totalHoursWorked: integer("total_hours_worked"),
   status: reportStatusEnum("status").notNull().default("SUBMITTED"),
   signatureUrl: text("signature_url"),
@@ -332,6 +343,7 @@ export const monthlyReports = omsSchema.table("monthly_reports", {
   month: integer("month").notNull(), // 1-12
   year: integer("year").notNull(),
   summary: text("summary"),
+  accomplishments: jsonb("accomplishments").$type<any[]>(),
   totalHoursWorked: integer("total_hours_worked"),
   status: reportStatusEnum("status").notNull().default("SUBMITTED"),
   signatureUrl: text("signature_url"),

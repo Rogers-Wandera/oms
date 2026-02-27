@@ -2,7 +2,12 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { dailyReports, weeklyReports, monthlyReports } from "@/lib/db/schema";
+import {
+  dailyReports,
+  weeklyReports,
+  monthlyReports,
+  users,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { ReportView } from "@/components/reports/report-view";
 
@@ -62,5 +67,10 @@ export default async function ReportDetailPage({
     redirect("/dashboard/reports");
   }
 
-  return <ReportView report={report} type={type} />;
+  // Fetch current manager profile for latest signature data
+  const manager = await db.query.users.findFirst({
+    where: eq(users.id, session.user.id),
+  });
+
+  return <ReportView report={report} type={type} manager={manager} />;
 }

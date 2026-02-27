@@ -5,6 +5,12 @@ import { users, userSessions, departments } from "@/lib/db/schema";
 import { eq, and, sql, desc, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { logAuthEvent } from "@/app/actions/auth-audit";
+import {
+  decryptText,
+  isValidTotp,
+  normalizeOtpCode,
+  verifyWithBackupCodes,
+} from "@/lib/security/two-factor";
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_TIME_MS = 30 * 60 * 1000; // 30 minutes
@@ -17,9 +23,12 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        otp: { label: "Authenticator Code", type: "text" },
       },
       async authorize(credentials) {
+        console.log("[Auth] authorize called with email:", credentials?.email);
         if (!credentials?.email || !credentials?.password) {
+          console.log("[Auth] Missing email or password");
           throw new Error("Email and password are required");
         }
 
@@ -33,7 +42,13 @@ export const authOptions: NextAuthOptions = {
           .where(eq(users.email, credentials.email as string))
           .limit(1);
 
+        console.log(
+          "[Auth] User lookup:",
+          userResults.length > 0 ? "found" : "not found",
+        );
+
         if (userResults.length === 0) {
+          console.log("[Auth] User not found");
           throw new Error("Invalid email or password");
         }
 
@@ -111,7 +126,68 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        // 3. Success: Reset attempts and update last login
+        // 3. Two-factor authentication check (if enabled)
+        const securitySettings = user.settings?.security;
+        console.log(
+          "[Auth] 2FA check - enabled:",
+          securitySettings?.twoFactorEnabled,
+        );
+        if (securitySettings?.twoFactorEnabled) {
+          const secretEncrypted = securitySettings.twoFactorSecret as
+            | string
+            | null;
+          if (!secretEncrypted) {
+            throw new Error("2FA configuration error");
+          }
+
+          let otpInput = String(credentials.otp || "");
+          // Handle cases where client might send the string "undefined" or "null"
+          if (otpInput === "undefined" || otpInput === "null") {
+            otpInput = "";
+          }
+          const otp = normalizeOtpCode(otpInput);
+          console.log(
+            "[Auth] OTP received (normalized):",
+            otp ? `[${otp}]` : "NONE",
+          );
+          if (!otp) {
+            console.log("[Auth] 2FA required but no OTP provided");
+            throw new Error("2FA_REQUIRED");
+          }
+
+          const secret = decryptText(secretEncrypted);
+          let isValid = isValidTotp(otp, secret);
+          console.log("[Auth] OTP valid:", isValid);
+
+          if (!isValid) {
+            const backupResult = verifyWithBackupCodes(
+              otp,
+              securitySettings.twoFactorBackupCodes ?? [],
+            );
+            isValid = backupResult.valid;
+
+            if (backupResult.valid) {
+              await db
+                .update(users)
+                .set({
+                  settings: {
+                    ...user.settings,
+                    security: {
+                      ...securitySettings,
+                      twoFactorBackupCodes: backupResult.remaining,
+                    },
+                  },
+                })
+                .where(eq(users.id, user.id));
+            }
+          }
+
+          if (!isValid) {
+            throw new Error("Invalid authentication code");
+          }
+        }
+
+        // 4. Success: Reset attempts and update last login
         await db
           .update(users)
           .set({
@@ -140,6 +216,7 @@ export const authOptions: NextAuthOptions = {
           departmentId: user.departmentId,
           departmentName: userResults[0].departmentName,
           supervisorId: user.supervisorId,
+          signatureUrl: user.signatureUrl,
         };
       },
     }),
@@ -198,6 +275,7 @@ export const authOptions: NextAuthOptions = {
         token.departmentId = user.departmentId;
         token.departmentName = user.departmentName;
         token.supervisorId = user.supervisorId;
+        token.signatureUrl = (user as any).signatureUrl;
         token.isLocked = (user as any).isLocked;
       }
       return token;
@@ -209,6 +287,9 @@ export const authOptions: NextAuthOptions = {
         session.user.departmentId = token.departmentId as string | null;
         session.user.departmentName = token.departmentName as string | null;
         session.user.supervisorId = token.supervisorId as string | null;
+        (session.user as any).signatureUrl = token.signatureUrl as
+          | string
+          | null;
         (session.user as any).isLocked = token.isLocked as boolean;
       }
       return session;
@@ -222,9 +303,26 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: {
     sessionToken: {
-      name: `next-auth.session-token`,
+      name: `oms-next-auth.session-token`,
       options: {
         httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    csrfToken: {
+      name: `oms-next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    callbackUrl: {
+      name: `oms-next-auth.callback-url`,
+      options: {
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",

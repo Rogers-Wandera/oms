@@ -5,46 +5,61 @@ import { AdminUsersView } from "@/components/admin/admin-users-view";
 
 import { db } from "@/lib/db";
 import { users, departments, userShifts, shifts } from "@/lib/db/schema";
-import { eq, or, and, sql, asc, desc } from "drizzle-orm";
+import { eq, or, and, sql, asc, desc, ilike } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getShifts } from "@/app/actions/shifts";
 
-async function getUsers(page = 1, pageSize = 10) {
+async function getUsers(page = 1, pageSize = 10, query?: string) {
   const supervisor = alias(users, "supervisor");
   const offset = (page - 1) * pageSize;
 
-  const totalCountResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(users);
-  const totalCount = Number(totalCountResult[0].count);
+  const whereConditions = [];
+  if (query) {
+    whereConditions.push(
+      or(
+        ilike(users.firstName, `%${query}%`),
+        ilike(users.lastName, `%${query}%`),
+        ilike(users.email, `%${query}%`),
+      ),
+    );
+  }
 
-  const results = await db
-    .select({
-      id: users.id,
-      firstName: users.firstName,
-      lastName: users.lastName,
-      email: users.email,
-      role: users.role,
-      creationDate: users.creationDate,
-      departmentName: departments.name,
-      departmentId: departments.id,
-      supervisorId: supervisor.id,
-      supervisorFirstName: supervisor.firstName,
-      supervisorLastName: supervisor.lastName,
-      shiftName: shifts.name,
-      shiftId: shifts.id,
-      isLocked: users.isLocked,
-      isOnline: users.isOnline,
-      lastLoginDate: users.lastLoginDate,
-    })
-    .from(users)
-    .leftJoin(departments, eq(users.departmentId, departments.id))
-    .leftJoin(supervisor, eq(users.supervisorId, supervisor.id))
-    .leftJoin(userShifts, eq(users.id, userShifts.userId))
-    .leftJoin(shifts, eq(userShifts.shiftId, shifts.id))
-    .orderBy(desc(users.creationDate))
-    .limit(pageSize)
-    .offset(offset);
+  const [totalCountResult, results] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined),
+    db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        role: users.role,
+        creationDate: users.creationDate,
+        departmentName: departments.name,
+        departmentId: departments.id,
+        supervisorId: supervisor.id,
+        supervisorFirstName: supervisor.firstName,
+        supervisorLastName: supervisor.lastName,
+        shiftName: shifts.name,
+        shiftId: shifts.id,
+        isLocked: users.isLocked,
+        isOnline: users.isOnline,
+        lastLoginDate: users.lastLoginDate,
+      })
+      .from(users)
+      .leftJoin(departments, eq(users.departmentId, departments.id))
+      .leftJoin(supervisor, eq(users.supervisorId, supervisor.id))
+      .leftJoin(userShifts, eq(users.id, userShifts.userId))
+      .leftJoin(shifts, eq(userShifts.shiftId, shifts.id))
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+      .orderBy(desc(users.creationDate))
+      .limit(pageSize)
+      .offset(offset),
+  ]);
+
+  const totalCount = Number(totalCountResult[0].count);
 
   return {
     data: results.map((u) => ({
@@ -96,7 +111,7 @@ async function getSupervisors() {
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; q?: string }>;
 }) {
   const session = await getServerSession(authOptions);
 
@@ -108,13 +123,13 @@ export default async function AdminUsersPage({
     redirect("/dashboard");
   }
 
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, q: query } = await searchParams;
   const page = Number(pageParam) || 1;
   const pageSize = 10;
 
   const [usersData, departmentsList, supervisorsList, shiftsList] =
     await Promise.all([
-      getUsers(page, pageSize),
+      getUsers(page, pageSize, query),
       getDepartments(),
       getSupervisors(),
       getShifts(),
@@ -128,6 +143,7 @@ export default async function AdminUsersPage({
       shifts={shiftsList}
       totalPages={usersData.totalPages}
       currentPage={page}
+      totalCount={usersData.totalCount}
     />
   );
 }

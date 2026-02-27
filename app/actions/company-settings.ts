@@ -4,10 +4,13 @@ import { db } from "@/lib/db";
 import { companySettings } from "@/lib/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
+import { safeAction } from "@/lib/actions-utils";
 
 export async function getCompanySettings() {
-  const settings = await db.select().from(companySettings).limit(1);
-  return settings[0] || null;
+  return safeAction(async () => {
+    const settings = await db.select().from(companySettings).limit(1);
+    return settings[0] || null;
+  });
 }
 
 export async function updateCompanySettings(data: {
@@ -23,17 +26,19 @@ export async function updateCompanySettings(data: {
     isClosed: boolean;
   }[];
 }) {
-  const existing = await getCompanySettings();
+  return safeAction(async () => {
+    const existing = await getCompanySettings();
 
-  if (existing) {
-    await db
-      .update(companySettings)
-      .set(data)
-      .where(eq(companySettings.id, existing.id));
-  } else {
-    await db.insert(companySettings).values(data);
-  }
+    if (existing) {
+      await db
+        .update(companySettings)
+        .set(data)
+        .where(eq(companySettings.id, existing.id));
+    } else {
+      await db.insert(companySettings).values(data);
+    }
 
-  revalidatePath("/admin/settings");
-  revalidatePath("/dashboard");
+    revalidatePath("/admin/settings");
+    revalidatePath("/dashboard");
+  });
 }

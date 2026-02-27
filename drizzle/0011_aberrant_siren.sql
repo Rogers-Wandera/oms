@@ -1,0 +1,6 @@
+ALTER TABLE "oms"."users" ALTER COLUMN "settings" SET DEFAULT '{"security":{"twoFactorMethod":"TOTP","twoFactorEnabled":false,"twoFactorBackupCodes":[],"twoFactorSecret":null,"twoFactorSetupDate":null,"loginNotifications":true,"suspiciousActivityAlerts":true,"blockedIpAddresses":[]},"privacy":{"emailVisibility":false,"phoneVisibility":false,"showOnlineStatus":true},"notifications":{"productUpdates":true,"securityAlerts":true,"newsletterSubscription":false},"appearance":{"theme":"system","fontFamily":"outfit","colorScheme":"default","layout":"default","layoutWidth":"fluid","isSidebarExpanded":true},"accessibility":{"fontSize":"md"},"work":{"startTime":"08:00","endTime":"17:00","timezone":"Africa/Kampala"}}'::jsonb;--> statement-breakpoint
+ALTER TABLE "oms"."attendance" ADD COLUMN "lat_in" text;--> statement-breakpoint
+ALTER TABLE "oms"."attendance" ADD COLUMN "long_in" text;--> statement-breakpoint
+ALTER TABLE "oms"."attendance" ADD COLUMN "lat_out" text;--> statement-breakpoint
+ALTER TABLE "oms"."attendance" ADD COLUMN "long_out" text;--> statement-breakpoint
+ALTER TABLE "oms"."users" ADD COLUMN "avatar_url" text;

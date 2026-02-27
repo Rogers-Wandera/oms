@@ -13,6 +13,7 @@ import { Clock, LogIn, LogOut, Loader2, Send } from "lucide-react";
 import { checkIn, checkOut } from "@/app/actions/attendance";
 import { useRouter } from "next/navigation";
 import { ExtensionRequestModal } from "./extension-request-modal";
+import { useLocation } from "./location-guard";
 
 interface AttendanceCardProps {
   attendance: {
@@ -32,11 +33,12 @@ export function AttendanceCard({
   const [isLoading, setIsLoading] = useState(false);
   const [extensionOpened, setExtensionOpened] = useState(false);
   const router = useRouter();
+  const { location } = useLocation();
 
   const handleCheckIn = async () => {
     setIsLoading(true);
     try {
-      await checkIn(userId);
+      await checkIn(userId, location || undefined);
       router.refresh();
     } finally {
       setIsLoading(false);
@@ -47,7 +49,7 @@ export function AttendanceCard({
     setIsLoading(true);
     try {
       if (attendance?.id) {
-        await checkOut(attendance.id);
+        await checkOut(attendance.id, location || undefined);
         router.refresh();
       }
     } finally {

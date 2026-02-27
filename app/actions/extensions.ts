@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { timeExtensions, users } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { safeAction } from "@/lib/actions-utils";
 
 export async function requestExtension({
   userId,
@@ -14,52 +15,60 @@ export async function requestExtension({
   extendedUntil: Date;
   reason: string;
 }) {
-  const today = new Date().toISOString().split("T")[0];
+  return safeAction(async () => {
+    const today = new Date().toISOString().split("T")[0];
 
-  await db.insert(timeExtensions).values({
-    userId,
-    date: today,
-    extendedUntil,
-    reason,
-    status: "PENDING",
+    await db.insert(timeExtensions).values({
+      userId,
+      date: today,
+      extendedUntil,
+      reason,
+      status: "PENDING",
+    });
+
+    revalidatePath("/dashboard");
   });
-
-  revalidatePath("/dashboard");
 }
 
 export async function approveExtension(extensionId: string, adminId: string) {
-  await db
-    .update(timeExtensions)
-    .set({
-      status: "APPROVED",
-      approvedBy: adminId,
-      updateDate: new Date(),
-    })
-    .where(eq(timeExtensions.id, extensionId));
+  return safeAction(async () => {
+    await db
+      .update(timeExtensions)
+      .set({
+        status: "APPROVED",
+        approvedBy: adminId,
+        updateDate: new Date(),
+      })
+      .where(eq(timeExtensions.id, extensionId));
 
-  revalidatePath("/dashboard");
-  revalidatePath("/admin/settings"); // Or wherever the management is
+    revalidatePath("/dashboard");
+    revalidatePath("/admin/settings"); // Or wherever the management is
+  });
 }
 
 export async function rejectExtension(extensionId: string, adminId: string) {
-  await db
-    .update(timeExtensions)
-    .set({
-      status: "REJECTED",
-      approvedBy: adminId,
-      updateDate: new Date(),
-    })
-    .where(eq(timeExtensions.id, extensionId));
+  return safeAction(async () => {
+    await db
+      .update(timeExtensions)
+      .set({
+        status: "REJECTED",
+        approvedBy: adminId,
+        updateDate: new Date(),
+      })
+      .where(eq(timeExtensions.id, extensionId));
 
-  revalidatePath("/dashboard");
+    revalidatePath("/dashboard");
+  });
 }
 
 export async function getPendingExtensions() {
-  return await db.query.timeExtensions.findMany({
-    where: eq(timeExtensions.status, "PENDING"),
-    with: {
-      user: true,
-    },
-    orderBy: [desc(timeExtensions.creationDate)],
+  return safeAction(async () => {
+    return await db.query.timeExtensions.findMany({
+      where: eq(timeExtensions.status, "PENDING"),
+      with: {
+        user: true,
+      },
+      orderBy: [desc(timeExtensions.creationDate)],
+    });
   });
 }

@@ -15,13 +15,24 @@ import { CompanySettingsForm } from "@/components/admin/company-settings-form";
 import { ShiftManagement } from "@/components/admin/shift-management";
 import { Building2, Clock, ShieldAlert } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { ServerPagination } from "../ui/server-pagination";
 
 interface SettingsTabsProps {
   initialData: any;
-  auditLogs: any[];
+  auditLogsData: any[];
+  pagination: {
+    page: number;
+    totalPages: number;
+    totalCount: number;
+    pageSize: number;
+  };
 }
 
-export function SettingsTabs({ initialData, auditLogs }: SettingsTabsProps) {
+export function SettingsTabs({
+  initialData,
+  auditLogsData,
+  pagination,
+}: SettingsTabsProps) {
   return (
     <Tabs defaultValue="company" variant="pills" color="brand" radius="xl">
       <Tabs.List className="bg-gray-100 dark:bg-white/5 p-1 rounded-2xl w-fit">
@@ -107,7 +118,7 @@ export function SettingsTabs({ initialData, auditLogs }: SettingsTabsProps) {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {auditLogs.map((log) => (
+                  {auditLogsData.map((log) => (
                     <Table.Tr
                       key={log.id}
                       className="hover:bg-gray-50/50 dark:hover:bg-white/2 transition-colors"
@@ -175,6 +186,15 @@ export function SettingsTabs({ initialData, auditLogs }: SettingsTabsProps) {
                 </Table.Tbody>
               </Table>
             </ScrollArea>
+
+            <div className="mt-4">
+              <ServerPagination
+                totalPages={pagination.totalPages}
+                currentPage={pagination.page}
+                pageSize={pagination.pageSize}
+                totalRecords={pagination.totalCount}
+              />
+            </div>
           </Stack>
         </Card>
       </Tabs.Panel>

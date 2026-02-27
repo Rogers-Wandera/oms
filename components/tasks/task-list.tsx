@@ -17,12 +17,14 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Lock,
 } from "lucide-react";
 import { updateTaskStatus } from "@/app/actions/tasks";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Pagination } from "@mantine/core";
 import { SubTaskList } from "./sub-task-list";
 import { cn } from "@/lib/utils";
+import dayjs from "dayjs";
+import { ServerPagination } from "../ui/server-pagination";
 
 interface Task {
   id: string;
@@ -33,6 +35,7 @@ interface Task {
   creationDate: string;
   created_by_name: string | null;
   subTasks: any[];
+  isLocked?: boolean;
 }
 
 interface TaskListProps {
@@ -40,6 +43,7 @@ interface TaskListProps {
   userId: string;
   totalPages: number;
   currentPage: number;
+  totalCount: number;
 }
 
 export function TaskList({
@@ -47,15 +51,22 @@ export function TaskList({
   userId,
   totalPages,
   currentPage,
+  totalCount,
 }: TaskListProps) {
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const activeStatus = searchParams.get("status") || "all";
 
-  const handlePageChange = (page: number) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("page", page.toString());
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all") {
+      params.delete("status");
+    } else {
+      params.set("status", value);
+    }
+    params.set("page", "1"); // Reset to page 1 on filter
     router.push(`${pathname}?${params.toString()}`);
   };
 
@@ -69,102 +80,62 @@ export function TaskList({
     }
   };
 
-  const pendingTasks = tasks.filter((t) => t.status === "PENDING");
-  const inProgressTasks = tasks.filter((t) => t.status === "IN_PROGRESS");
-  const completedTasks = tasks.filter((t) => t.status === "COMPLETED");
-
   return (
-    <Tabs defaultValue="all" className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="all">All ({tasks.length})</TabsTrigger>
-        <TabsTrigger value="pending">
-          Pending ({pendingTasks.length})
-        </TabsTrigger>
-        <TabsTrigger value="in_progress">
-          In Progress ({inProgressTasks.length})
-        </TabsTrigger>
-        <TabsTrigger value="completed">
-          Completed ({completedTasks.length})
-        </TabsTrigger>
-      </TabsList>
+    <div className="space-y-4">
+      <Tabs value={activeStatus} onValueChange={handleTabChange}>
+        <TabsList className="bg-transparent border-b rounded-none w-full justify-start h-auto p-0 gap-6">
+          <TabsTrigger
+            value="all"
+            className="data-[state=active]:border-brand-500 data-[state=active]:text-brand-600 border-b-2 border-transparent rounded-none px-1 pb-2 bg-transparent"
+          >
+            All Tasks
+          </TabsTrigger>
+          <TabsTrigger
+            value="PENDING"
+            className="data-[state=active]:border-brand-500 data-[state=active]:text-brand-600 border-b-2 border-transparent rounded-none px-1 pb-2 bg-transparent"
+          >
+            Pending
+          </TabsTrigger>
+          <TabsTrigger
+            value="IN_PROGRESS"
+            className="data-[state=active]:border-brand-500 data-[state=active]:text-brand-600 border-b-2 border-transparent rounded-none px-1 pb-2 bg-transparent"
+          >
+            In Progress
+          </TabsTrigger>
+          <TabsTrigger
+            value="COMPLETED"
+            className="data-[state=active]:border-brand-500 data-[state=active]:text-brand-600 border-b-2 border-transparent rounded-none px-1 pb-2 bg-transparent"
+          >
+            Completed
+          </TabsTrigger>
+        </TabsList>
 
-      <TabsContent value="all" className="space-y-3">
-        {tasks.length === 0 ? (
-          <EmptyState />
-        ) : (
-          tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              userId={userId}
-              onStatusChange={handleStatusChange}
-              isUpdating={isUpdating === task.id}
-            />
-          ))
-        )}
-      </TabsContent>
+        <TabsContent value={activeStatus} className="space-y-3 mt-4">
+          {tasks.length === 0 ? (
+            <EmptyState />
+          ) : (
+            tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                userId={userId}
+                onStatusChange={handleStatusChange}
+                isUpdating={isUpdating === task.id}
+              />
+            ))
+          )}
+        </TabsContent>
+      </Tabs>
 
-      <TabsContent value="pending" className="space-y-3">
-        {pendingTasks.length === 0 ? (
-          <EmptyState message="No pending tasks" />
-        ) : (
-          pendingTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              userId={userId}
-              onStatusChange={handleStatusChange}
-              isUpdating={isUpdating === task.id}
-            />
-          ))
-        )}
-      </TabsContent>
-
-      <TabsContent value="in_progress" className="space-y-3">
-        {inProgressTasks.length === 0 ? (
-          <EmptyState message="No tasks in progress" />
-        ) : (
-          inProgressTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              userId={userId}
-              onStatusChange={handleStatusChange}
-              isUpdating={isUpdating === task.id}
-            />
-          ))
-        )}
-      </TabsContent>
-
-      <TabsContent value="completed" className="space-y-3">
-        {completedTasks.length === 0 ? (
-          <EmptyState message="No completed tasks" />
-        ) : (
-          completedTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              userId={userId}
-              onStatusChange={handleStatusChange}
-              isUpdating={isUpdating === task.id}
-            />
-          ))
-        )}
-      </TabsContent>
-
-      {totalPages > 1 && (
-        <div className="flex justify-center mt-8">
-          <Pagination
-            total={totalPages}
-            value={currentPage}
-            onChange={handlePageChange}
-            color="brand"
-            size="sm"
-            radius="xl"
-          />
-        </div>
-      )}
-    </Tabs>
+      <div className="mt-6">
+        <ServerPagination
+          totalPages={totalPages}
+          currentPage={currentPage}
+          pageSize={10}
+          totalRecords={totalCount}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -220,7 +191,7 @@ function TaskCard({
   const isOverdue =
     task.due_date &&
     task.status !== "COMPLETED" &&
-    new Date(task.due_date) < new Date();
+    dayjs().isAfter(dayjs(task.due_date).endOf("day"));
 
   return (
     <Card className={cn("premium-card", isOverdue && "border-error-500/50")}>
@@ -232,6 +203,15 @@ function TaskCard({
                 {task.title}
               </h3>
               {getStatusBadge(task.status)}
+              {task.isLocked && (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] h-5 bg-gray-100 dark:bg-white/5"
+                >
+                  <Lock size={10} className="mr-1" />
+                  Submitted
+                </Badge>
+              )}
               {isOverdue && (
                 <Badge variant="destructive" className="text-[10px] h-5">
                   Overdue
@@ -258,11 +238,16 @@ function TaskCard({
               taskId={task.id}
               subTasks={task.subTasks}
               userId={userId}
+              isLocked={task.isLocked}
             />
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" disabled={isUpdating}>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={isUpdating || task.isLocked}
+              >
                 <MoreVertical className="w-4 h-4" />
                 <span className="sr-only">Task actions</span>
               </Button>

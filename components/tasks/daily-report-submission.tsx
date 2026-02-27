@@ -12,6 +12,8 @@ import {
   Card,
   List,
   ThemeIcon,
+  Badge,
+  Center,
 } from "@mantine/core";
 import { Check, Send, PenTool } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
@@ -50,11 +52,41 @@ export function DailyReportSubmission({
 
   // Filter tasks and subtasks done today
   const today = new Date().toISOString().split("T")[0];
-  const completedToday = tasks.filter((t) => t.status === "COMPLETED");
-  // In a real scenario, we'd check the updateDate. For now, we take 'COMPLETED' status as of today.
+
+  const completedTasksToday = tasks.filter((t) => {
+    if (!t.completedAt) return false;
+    return t.completedAt.split("T")[0] === today;
+  });
+
+  const completedSubTasksToday = tasks.flatMap((t) =>
+    (t.subTasks || [])
+      .filter((st: any) => {
+        if (!st.completedAt) return false;
+        return new Date(st.completedAt).toISOString().split("T")[0] === today;
+      })
+      .map((st: any) => ({
+        ...st,
+        parentTaskTitle: t.title,
+      })),
+  );
+
+  const allAccomplishments = [
+    ...completedTasksToday.map((t) => ({
+      id: t.id,
+      title: t.title,
+      type: "TASK",
+    })),
+    ...completedSubTasksToday.map((st) => ({
+      id: st.id,
+      title: `${st.title} (Sub-task of ${st.parentTaskTitle})`,
+      type: "SUB_TASK",
+    })),
+  ];
 
   const handleSubmit = async () => {
-    if (signatureRef.current?.isEmpty()) {
+    const isSignatureEmpty = signatureRef.current?.isEmpty();
+
+    if (isSignatureEmpty && !userSignature) {
       notifications.show({
         title: "Signature Required",
         message: "Please sign before submitting",
@@ -69,20 +101,12 @@ export function DailyReportSubmission({
         ?.getTrimmedCanvas()
         .toDataURL("image/png");
 
-      // Note: In a production app, we would upload this image to S3/Blob storage
-      // and pass the URL. For this demo/internal tool, we'll store the base64 or a placeholder.
-      // I'll update the server action to handle this.
-
       await createReport({
         userId,
         content: comment,
         reportDate: today,
         signatureUrl: signatureData,
-        // Passing accomplishments as an array of objects
-        accomplishments: completedToday.map((t) => ({
-          id: t.id,
-          title: t.title,
-        })),
+        accomplishments: allAccomplishments,
       });
 
       notifications.show({
@@ -121,29 +145,61 @@ export function DailyReportSubmission({
         size="lg"
       >
         <Stack gap="md">
-          <Card withBorder padding="sm" radius="md" className="premium-card">
-            <Title order={5} mb="xs">
-              Today's Accomplishments
-            </Title>
-            {completedToday.length > 0 ? (
-              <List
-                spacing="xs"
-                size="sm"
-                center
-                icon={
-                  <ThemeIcon color="success" size={20} radius="xl">
-                    <Check size={12} />
-                  </ThemeIcon>
-                }
-              >
-                {completedToday.map((t) => (
-                  <List.Item key={t.id}>{t.title}</List.Item>
+          <Card
+            withBorder
+            padding="md"
+            radius="xl"
+            className="premium-card bg-brand-500/5 border-brand-500/10"
+          >
+            <Group justify="space-between" mb="xs">
+              <Title order={5} className="gradient-text">
+                Today's Accomplishments
+              </Title>
+              <Badge color="success" variant="light">
+                {allAccomplishments.length} Items Done
+              </Badge>
+            </Group>
+
+            {allAccomplishments.length > 0 ? (
+              <Stack gap="xs">
+                {allAccomplishments.map((item) => (
+                  <Group key={item.id} wrap="nowrap" gap="sm">
+                    <ThemeIcon
+                      color={item.type === "TASK" ? "success" : "brand"}
+                      size={24}
+                      radius="xl"
+                      variant="light"
+                    >
+                      <Check size={14} />
+                    </ThemeIcon>
+                    <div>
+                      <Text size="sm" fw={600}>
+                        {item.title}
+                      </Text>
+                      <Text
+                        size="10px"
+                        c="dimmed"
+                        className="uppercase tracking-tighter"
+                      >
+                        {item.type === "TASK"
+                          ? "Main Task"
+                          : "Sub-task Completion"}
+                      </Text>
+                    </div>
+                  </Group>
                 ))}
-              </List>
+              </Stack>
             ) : (
-              <Text size="sm" c="dimmed">
-                No tasks marked as completed today.
-              </Text>
+              <Center py="xl">
+                <Stack align="center" gap="xs">
+                  <Text size="sm" c="dimmed" fw={500}>
+                    No tasks marked as completed today.
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Complete your tasks first to see them here!
+                  </Text>
+                </Stack>
+              </Center>
             )}
           </Card>
 

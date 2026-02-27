@@ -20,6 +20,7 @@ interface AttendanceGuardProps {
   attendanceBase: any;
   accessAllowed: boolean;
   reason?: string;
+  twoFactorSetupRequired?: boolean;
 }
 
 export function AttendanceGuard({
@@ -28,8 +29,49 @@ export function AttendanceGuard({
   attendanceBase,
   accessAllowed,
   reason,
+  twoFactorSetupRequired,
 }: AttendanceGuardProps) {
   const pathname = usePathname();
+
+  if (twoFactorSetupRequired && !pathname.startsWith("/dashboard/profile")) {
+    return (
+      <Container size="sm" py={100}>
+        <Center>
+          <Stack gap="xl" align="center" style={{ textAlign: "center" }}>
+            <div
+              style={{
+                width: 80,
+                height: 80,
+                backgroundColor: "var(--mantine-color-red-light)",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <LogIn size={40} color="var(--mantine-color-red-filled)" />
+            </div>
+
+            <div>
+              <Title order={2}>Two-Factor Setup Required</Title>
+              <Text c="dimmed" mt="sm">
+                Admin access requires an authenticator app. Complete setup to
+                continue.
+              </Text>
+            </div>
+
+            <Button
+              color="brand"
+              size="md"
+              onClick={() => (window.location.href = "/dashboard/profile")}
+            >
+              Go to Profile Setup
+            </Button>
+          </Stack>
+        </Center>
+      </Container>
+    );
+  }
 
   if (accessAllowed) {
     return <>{children}</>;

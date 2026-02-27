@@ -29,6 +29,14 @@ interface DataTableProps<T> {
   defaultPageSize?: number;
   loading?: boolean;
   onRowClick?: (record: T) => void;
+  // Server-side props
+  serverSide?: boolean;
+  totalRecords?: number;
+  totalPages?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
+  onSearchChange?: (query: string) => void;
+  searchValue?: string;
 }
 
 export function DataTable<T extends { id: string | number }>({
@@ -40,29 +48,48 @@ export function DataTable<T extends { id: string | number }>({
   defaultPageSize = 10,
   loading = false,
   onRowClick,
+  serverSide = false,
+  totalRecords,
+  totalPages: serverTotalPages,
+  currentPage: serverCurrentPage,
+  onPageChange,
+  onSearchChange,
+  searchValue,
 }: DataTableProps<T>) {
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [localSearch, setLocalSearch] = useState("");
+  const [localPage, setLocalPage] = useState(1);
   const [pageSize, setPageSize] = useState<string>(defaultPageSize.toString());
 
-  // Filter
-  const filteredData = data.filter((item) => {
-    if (!search || searchKeys.length === 0) return true;
-    return searchKeys.some((key) => {
-      const val = item[key];
-      if (typeof val === "string") {
-        return val.toLowerCase().includes(search.toLowerCase());
-      }
-      return false;
-    });
-  });
+  const search = serverSide ? searchValue : localSearch;
+  const page = serverSide ? serverCurrentPage : localPage;
 
-  // Paginate
-  const totalPages = Math.ceil(filteredData.length / parseInt(pageSize));
-  const startIndex = (page - 1) * parseInt(pageSize);
-  const paginatedData = pagination
-    ? filteredData.slice(startIndex, startIndex + parseInt(pageSize))
-    : filteredData;
+  // Filter (only if client-side)
+  const filteredData = serverSide
+    ? data
+    : data.filter((item) => {
+        if (!search || searchKeys.length === 0) return true;
+        return searchKeys.some((key) => {
+          const val = item[key];
+          if (typeof val === "string") {
+            return val.toLowerCase().includes(search.toLowerCase());
+          }
+          return false;
+        });
+      });
+
+  // Total pages
+  const totalPages = serverSide
+    ? serverTotalPages || 1
+    : Math.ceil(filteredData.length / parseInt(pageSize));
+
+  // Paginated data (only if client-side)
+  const startIndex = (page! - 1) * parseInt(pageSize);
+  const paginatedData =
+    pagination && !serverSide
+      ? filteredData.slice(startIndex, startIndex + parseInt(pageSize))
+      : filteredData;
+
+  const totalCount = serverSide ? totalRecords : filteredData.length;
 
   return (
     <Stack gap="md" pos="relative">
@@ -79,14 +106,20 @@ export function DataTable<T extends { id: string | number }>({
             leftSection={<Search size={16} />}
             value={search}
             onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1); // Reset to first page
+              if (serverSide) {
+                onSearchChange?.(e.target.value);
+              } else {
+                setLocalSearch(e.target.value);
+                setLocalPage(1);
+              }
             }}
             w={{ base: "100%", sm: 300 }}
           />
-          <Text size="sm" c="dimmed">
-            {filteredData.length} records found
-          </Text>
+          {totalCount !== undefined && (
+            <Text size="sm" c="dimmed">
+              {totalCount} records found
+            </Text>
+          )}
         </Group>
       )}
 
@@ -142,22 +175,30 @@ export function DataTable<T extends { id: string | number }>({
 
       {pagination && (
         <Group justify="space-between" mt="sm">
-          <Select
-            w={100}
-            value={pageSize}
-            onChange={(val) => {
-              if (val) {
-                setPageSize(val);
-                setPage(1);
-              }
-            }}
-            data={["5", "10", "20", "50", "100"]}
-            comboboxProps={{ withinPortal: false }}
-          />
+          {!serverSide && (
+            <Select
+              w={100}
+              value={pageSize}
+              onChange={(val) => {
+                if (val) {
+                  setPageSize(val);
+                  setLocalPage(1);
+                }
+              }}
+              data={["5", "10", "20", "50", "100"]}
+              comboboxProps={{ withinPortal: false }}
+            />
+          )}
           <Pagination
             total={totalPages}
             value={page}
-            onChange={setPage}
+            onChange={(val) => {
+              if (serverSide) {
+                onPageChange?.(val);
+              } else {
+                setLocalPage(val);
+              }
+            }}
             color="brand"
             radius="md"
           />

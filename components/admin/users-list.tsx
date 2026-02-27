@@ -28,6 +28,7 @@ import {
   unlockUser,
   invalidateAllUserSessions,
 } from "@/app/actions/auth-audit";
+import { disableTwoFactorForUser } from "@/app/actions/two-factor";
 import { createNotification } from "@/app/actions/notifications";
 import { DataTable } from "@/components/ui/data-table";
 import { notifications } from "@mantine/notifications";
@@ -59,7 +60,12 @@ interface UsersListProps {
   shifts: any[];
   totalPages: number;
   currentPage: number;
+  totalCount: number;
   onEdit: (user: UserData) => void;
+  onPageChange?: (page: number) => void;
+  onSearchChange?: (query: string) => void;
+  searchValue?: string;
+  isLoading?: boolean;
 }
 
 export function UsersList({
@@ -69,7 +75,12 @@ export function UsersList({
   shifts,
   totalPages,
   currentPage,
+  totalCount,
   onEdit,
+  onPageChange,
+  onSearchChange,
+  searchValue,
+  isLoading = false,
 }: UsersListProps) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [extendingUser, setExtendingUser] = useState<UserData | null>(null);
@@ -127,6 +138,35 @@ export function UsersList({
       notifications.show({
         title: "Error",
         message: "Failed to log out user",
+        color: "error",
+      });
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleDisableTwoFactor = async (user: UserData) => {
+    setLoadingAction(user.id);
+    try {
+      const result = await disableTwoFactorForUser(user.id);
+      if (result.error) {
+        notifications.show({
+          title: "Error",
+          message: result.error,
+          color: "error",
+        });
+        return;
+      }
+
+      notifications.show({
+        title: "Success",
+        message: "Two-factor authentication disabled for user",
+        color: "success",
+      });
+    } catch (e) {
+      notifications.show({
+        title: "Error",
+        message: "Failed to disable 2FA",
         color: "error",
       });
     } finally {
@@ -342,6 +382,14 @@ export function UsersList({
               onClick={() => handleLogOutUser(user)}
             >
               Force Log Out
+            </Menu.Item>
+
+            <Menu.Item
+              leftSection={<Shield size={14} />}
+              color="yellow"
+              onClick={() => handleDisableTwoFactor(user)}
+            >
+              Reset 2FA
             </Menu.Item>
 
             {user.is_locked ? (

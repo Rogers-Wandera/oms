@@ -35,13 +35,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     const socketInstance = io(
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001",
+      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3701",
       {
         reconnectionAttempts: 5,
         withCredentials: true,
-        extraHeaders: {
-          Cookie: document.cookie,
-        },
       },
     );
 

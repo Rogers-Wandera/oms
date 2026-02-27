@@ -3,13 +3,15 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users, tasks, dailyReports, attendance } from "@/lib/db/schema";
-import { eq, and, gte, lte, count, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, count, sql, desc, ne, lt } from "drizzle-orm";
 import { AttendanceCard } from "@/components/dashboard/attendance-card";
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { HoursAnalytics } from "@/components/dashboard/hours-analytics";
 import { DeadlineCountdowns } from "@/components/dashboard/deadline-countdowns";
 import { DashboardAnalyticsGrid } from "@/components/dashboard/dashboard-analytics-grid";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Calendar, AlertCircle } from "lucide-react";
 
 async function getAttendanceToday(userId: string) {
   const today = new Date().toISOString().split("T")[0];
@@ -171,12 +173,32 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const [attendanceToday, stats, recentActivity, fullUser] = await Promise.all([
-    getAttendanceToday(session.user.id),
-    getStats(session.user.id),
-    getRecentActivity(session.user.id),
-    db.query.users.findFirst({ where: eq(users.id, session.user.id) }),
-  ]);
+  const [attendanceToday, stats, recentActivity, fullUser, managementStats] =
+    await Promise.all([
+      getAttendanceToday(session.user.id),
+      getStats(session.user.id),
+      getRecentActivity(session.user.id),
+      db.query.users.findFirst({ where: eq(users.id, session.user.id) }),
+      session.user.role === "ADMIN" || session.user.role === "MANAGER"
+        ? (async () => {
+            const today = new Date().toISOString().split("T")[0];
+            const [dueToday, overdue] = await Promise.all([
+              db
+                .select({ value: count() })
+                .from(tasks)
+                .where(and(eq(tasks.date, today), ne(tasks.status, "DONE"))),
+              db
+                .select({ value: count() })
+                .from(tasks)
+                .where(and(lt(tasks.date, today), ne(tasks.status, "DONE"))),
+            ]);
+            return {
+              dueToday: Number(dueToday[0]?.value || 0),
+              overdue: Number(overdue[0]?.value || 0),
+            };
+          })()
+        : Promise.resolve(null),
+    ]);
 
   const dashboardUser = { ...session.user, ...fullUser };
 
@@ -192,6 +214,43 @@ export default async function DashboardPage() {
       </div>
 
       <DeadlineCountdowns user={dashboardUser} />
+
+      {managementStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="premium-card border-amber-500/20 bg-amber-500/5">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-amber-600">
+                System Due Today
+              </CardTitle>
+              <Calendar className="w-4 h-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {managementStats.dueToday}
+              </div>
+              <p className="text-xs text-muted-foreground italic">
+                Total tasks pending today
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="premium-card border-red-500/20 bg-red-500/5">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-red-600">
+                System Overdue
+              </CardTitle>
+              <AlertCircle className="w-4 h-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {managementStats.overdue}
+              </div>
+              <p className="text-xs text-muted-foreground italic">
+                Total tasks past deadline
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <AttendanceCard
         attendance={attendanceToday}

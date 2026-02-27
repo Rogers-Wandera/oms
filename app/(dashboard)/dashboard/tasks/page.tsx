@@ -4,23 +4,52 @@ import { redirect } from "next/navigation";
 import { TaskList } from "@/components/tasks/task-list";
 import { CreateTaskButton } from "@/components/tasks/create-task-button";
 import { DailyReportSubmission } from "@/components/tasks/daily-report-submission";
+import { WeeklyReportSubmission } from "@/components/tasks/weekly-report-submission";
+import { MonthlyReportSubmission } from "@/components/tasks/monthly-report-submission";
 import { Group } from "@mantine/core";
+import { TaskFilters } from "@/components/tasks/task-filters";
 
 import { db } from "@/lib/db";
 import { tasks, users, dailyReports } from "@/lib/db/schema";
 import { eq, sql, asc, desc, and } from "drizzle-orm";
 
-async function getTasks(userId: string, page = 1, pageSize = 10) {
+async function getTasks(
+  userId: string,
+  page = 1,
+  pageSize = 10,
+  q?: string,
+  statusFilter?: string,
+) {
   const offset = (page - 1) * pageSize;
+
+  const whereConditions = [eq(tasks.assignedTo, userId)];
+  if (q) {
+    whereConditions.push(sql`${tasks.title} ILIKE ${`%${q}%`}`);
+  }
+
+  if (statusFilter && statusFilter !== "all") {
+    // Map UI status back to DB status
+    const dbStatus =
+      statusFilter === "PENDING"
+        ? "PLANNED"
+        : statusFilter === "IN_PROGRESS"
+          ? "NOT_DONE"
+          : statusFilter === "COMPLETED"
+            ? "DONE"
+            : null;
+    if (dbStatus) {
+      whereConditions.push(eq(tasks.status, dbStatus as any));
+    }
+  }
 
   const totalCountResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(tasks)
-    .where(eq(tasks.assignedTo, userId));
+    .where(and(...whereConditions));
   const totalCount = Number(totalCountResult[0].count);
 
   const results = await db.query.tasks.findMany({
-    where: (t, { eq }) => eq(t.assignedTo, userId),
+    where: and(...whereConditions),
     with: {
       subTasks: true,
       creator: true,
@@ -38,6 +67,12 @@ async function getTasks(userId: string, page = 1, pageSize = 10) {
     offset: offset,
   });
 
+  const lockedDates = await db
+    .select({ date: dailyReports.date })
+    .from(dailyReports)
+    .where(eq(dailyReports.userId, userId));
+  const lockedDatesSet = new Set(lockedDates.map((d) => d.date));
+
   return {
     data: results.map((t) => ({
       id: t.id,
@@ -51,9 +86,11 @@ async function getTasks(userId: string, page = 1, pageSize = 10) {
             : "PENDING",
       due_date: t.date,
       date: t.date,
+      isLocked: t.date ? lockedDatesSet.has(t.date) : false,
       createdBy: t.createdBy,
       creationDate: t.creationDate.toISOString(),
       creation_date: t.creationDate.toISOString(),
+      completedAt: t.completedAt ? t.completedAt.toISOString() : null,
       created_by_name: t.creator
         ? `${t.creator.firstName} ${t.creator.lastName}`.trim()
         : "System",
@@ -67,7 +104,7 @@ async function getTasks(userId: string, page = 1, pageSize = 10) {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; q?: string; status?: string }>;
 }) {
   const session = await getServerSession(authOptions);
 
@@ -75,13 +112,13 @@ export default async function TasksPage({
     redirect("/login");
   }
 
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, q, status } = await searchParams;
   const page = Number(pageParam) || 1;
   const pageSize = 10;
 
   const today = new Date().toISOString().split("T")[0];
   const [tasksData, existingReport, fullUser] = await Promise.all([
-    getTasks(session.user.id, page, pageSize),
+    getTasks(session.user.id, page, pageSize, q, status),
     db.query.dailyReports.findFirst({
       where: and(
         eq(dailyReports.userId, session.user.id),
@@ -94,6 +131,13 @@ export default async function TasksPage({
     }),
   ]);
 
+  // Fetch team members if supervisor or admin
+  let teamMembers: any[] = [];
+  if (session.user.role === "SUPERVISOR" || session.user.role === "ADMIN") {
+    const { getTeamMembers } = await import("@/app/actions/users");
+    teamMembers = await getTeamMembers(session.user.id);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -104,21 +148,37 @@ export default async function TasksPage({
           </p>
         </div>
         <Group gap="sm">
-          <DailyReportSubmission
-            tasks={tasksData.data}
+          <Group>
+            <DailyReportSubmission
+              tasks={tasksData.data}
+              userId={session.user.id}
+              existingReport={existingReport}
+              userSignature={fullUser?.signatureUrl}
+            />
+            <WeeklyReportSubmission
+              tasks={tasksData.data}
+              userId={session.user.id}
+            />
+            <MonthlyReportSubmission
+              tasks={tasksData.data}
+              userId={session.user.id}
+            />
+          </Group>
+          <CreateTaskButton
             userId={session.user.id}
-            existingReport={existingReport}
-            userSignature={fullUser?.signatureUrl}
+            subordinates={teamMembers}
           />
-          <CreateTaskButton userId={session.user.id} />
         </Group>
       </div>
+
+      <TaskFilters />
 
       <TaskList
         tasks={tasksData.data}
         userId={session.user.id}
         totalPages={tasksData.totalPages}
         currentPage={page}
+        totalCount={tasksData.totalCount}
       />
     </div>
   );
