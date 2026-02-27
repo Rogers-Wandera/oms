@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "attendance_user_date_idx" ON "oms"."attendance" USING btree ("user_id","date");
