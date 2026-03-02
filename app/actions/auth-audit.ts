@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { authAudit, users, notifications, userSessions } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { safeAction } from "@/lib/actions-utils";
 
@@ -137,7 +137,7 @@ export async function getAuthAuditLogs(
 
     const [totalCountResult, logs] = await Promise.all([
       db
-        .select({ value: drizzleCount() })
+        .select({ value: count() })
         .from(authAudit)
         .where(userId ? eq(authAudit.userId, userId) : undefined),
       db.query.authAudit.findMany({

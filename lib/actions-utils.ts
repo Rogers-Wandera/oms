@@ -1,4 +1,4 @@
-import { isRedirectError } from "next/dist/client/components/redirect";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 /**
  * Wraps a server action to prevent sensitive error leakage (like SQL strings)
@@ -9,7 +9,16 @@ export async function safeAction<T>(action: () => Promise<T>): Promise<T> {
     return await action();
   } catch (error: any) {
     // If it's a Next.js redirect, we MUST re-throw it so the router can handle it
-    if (isRedirectError(error)) {
+    if (typeof isRedirectError === "function" && isRedirectError(error)) {
+      throw error;
+    }
+
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      String(error.digest).startsWith("NEXT_REDIRECT")
+    ) {
       throw error;
     }
 
@@ -21,10 +30,6 @@ export async function safeAction<T>(action: () => Promise<T>): Promise<T> {
       throw error;
     }
 
-    // In production, return a generic message
-    // If the error already has a 'friendly' status or is a known business error,
-    // we could potentially pass it through, but to be safe against SQL leakage,
-    // we use a generic one unless we implement a specific Error class.
     throw new Error("An unexpected error occurred. Please try again later.");
   }
 }

@@ -54,8 +54,8 @@ export function GenerateDeptReportsButton() {
       >
         <Stack gap="md">
           <Text size="sm">
-            This will aggregate all submitted daily reports for today and create
-            consolidated summaries for each department.
+            This will aggregate all submitted and approved individual reports
+            for today into consolidated departmental summaries.
           </Text>
           <Text size="xs" c="dimmed">
             Note: This process usually runs automatically via cron, but you can

@@ -33,7 +33,10 @@ export async function generateDailyDepartmentReport(
       where: and(
         or(...userIds.map((id) => eq(dailyReports.userId, id))),
         eq(dailyReports.date, dateStr),
-        eq(dailyReports.status, "SUBMITTED"),
+        or(
+          eq(dailyReports.status, "SUBMITTED"),
+          eq(dailyReports.status, "APPROVED"),
+        ),
       ),
       with: {
         user: true,
@@ -49,6 +52,25 @@ export async function generateDailyDepartmentReport(
       )
       .join("\n\n");
 
+    const existing = await db.query.departmentReports.findFirst({
+      where: and(
+        eq(departmentReports.departmentId, departmentId),
+        eq(departmentReports.date, dateStr),
+        eq(departmentReports.type, "DAILY"),
+      ),
+    });
+
+    if (existing) {
+      await db
+        .update(departmentReports)
+        .set({ summary, updateDate: new Date() })
+        .where(eq(departmentReports.id, existing.id));
+      try {
+        revalidatePath("/manager/department-reports");
+      } catch (e) {}
+      return existing;
+    }
+
     const [newReport] = await db
       .insert(departmentReports)
       .values({
@@ -60,7 +82,9 @@ export async function generateDailyDepartmentReport(
       })
       .returning();
 
-    revalidatePath("/manager/department-reports");
+    try {
+      revalidatePath("/manager/department-reports");
+    } catch (e) {}
     return newReport;
   });
 }
@@ -106,6 +130,26 @@ export async function generateWeeklyDepartmentReport(
       )
       .join("\n\n---\n\n");
 
+    const existing = await db.query.departmentReports.findFirst({
+      where: and(
+        eq(departmentReports.departmentId, departmentId),
+        eq(departmentReports.startDate, startDate),
+        eq(departmentReports.endDate, endDate),
+        eq(departmentReports.type, "WEEKLY"),
+      ),
+    });
+
+    if (existing) {
+      await db
+        .update(departmentReports)
+        .set({ summary, updateDate: new Date() })
+        .where(eq(departmentReports.id, existing.id));
+      try {
+        revalidatePath("/manager/department-reports");
+      } catch (e) {}
+      return existing;
+    }
+
     const [newReport] = await db
       .insert(departmentReports)
       .values({
@@ -118,7 +162,9 @@ export async function generateWeeklyDepartmentReport(
       })
       .returning();
 
-    revalidatePath("/manager/department-reports");
+    try {
+      revalidatePath("/manager/department-reports");
+    } catch (e) {}
     return newReport;
   });
 }
@@ -164,6 +210,26 @@ export async function generateMonthlyDepartmentReport(
       )
       .join("\n\n---\n\n");
 
+    const existing = await db.query.departmentReports.findFirst({
+      where: and(
+        eq(departmentReports.departmentId, departmentId),
+        eq(departmentReports.month, month),
+        eq(departmentReports.year, year),
+        eq(departmentReports.type, "MONTHLY"),
+      ),
+    });
+
+    if (existing) {
+      await db
+        .update(departmentReports)
+        .set({ summary, updateDate: new Date() })
+        .where(eq(departmentReports.id, existing.id));
+      try {
+        revalidatePath("/manager/department-reports");
+      } catch (e) {}
+      return existing;
+    }
+
     const [newReport] = await db
       .insert(departmentReports)
       .values({
@@ -176,7 +242,9 @@ export async function generateMonthlyDepartmentReport(
       })
       .returning();
 
-    revalidatePath("/manager/department-reports");
+    try {
+      revalidatePath("/manager/department-reports");
+    } catch (e) {}
     return newReport;
   });
 }
